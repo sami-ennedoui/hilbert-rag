@@ -27,7 +27,12 @@ SELECTIVITY_GRID = (1.0, 0.5, 0.25, 0.1, 0.05, 0.01)  # |filtered| / |corpus|
 # librarian-bots/arxiv-metadata-snapshot, filtered to these primary categories
 # and date window, then deterministically sampled.
 ARXIV_DATASET = "librarian-bots/arxiv-metadata-snapshot"
-ARXIV_CATEGORIES = ("cs.LG", "cs.CL", "cs.CV", "cs.AI", "stat.ML", "math.OC")
+# Populous ML / stats / signal / optimization categories. The date field is the
+# submission month parsed from the arXiv id, not the update_date.
+ARXIV_CATEGORIES = (
+    "cs.LG", "cs.CL", "cs.CV", "cs.AI", "stat.ML",
+    "cs.NE", "cs.IR", "cs.RO", "eess.SP", "math.OC",
+)
 DATE_MIN = "2018-01-01"
 DATE_MAX = "2024-12-31"
 TARGET_CORPUS_SIZE = 40_000

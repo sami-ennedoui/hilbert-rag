@@ -20,6 +20,25 @@ def _primary_category(raw: str) -> str:
     return parts[0] if parts else ""
 
 
+def submission_date_from_id(arxiv_id: str) -> str | None:
+    """Submission date 'YYYY-MM-01' parsed from a modern arXiv id 'YYMM.NNNNN'.
+
+    The id encodes the original submission month, a cleaner 'published' date than
+    the update_date field, which records the last modification. Returns None for
+    legacy ids (no YYMM prefix) or an invalid month.
+    """
+    if "." not in arxiv_id:
+        return None
+    head = arxiv_id.split(".")[0]
+    if len(head) != 4 or not head.isdigit():
+        return None
+    yy, mm = int(head[:2]), int(head[2:4])
+    if not 1 <= mm <= 12:
+        return None
+    year = 2000 + yy if yy < 90 else 1900 + yy
+    return f"{year:04d}-{mm:02d}-01"
+
+
 def filter_and_sample(
     records: Iterable[Mapping],
     categories: tuple[str, ...],

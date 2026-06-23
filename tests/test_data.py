@@ -22,6 +22,16 @@ def test_filter_and_sample_respects_category_date_and_is_deterministic():
     pd.testing.assert_frame_equal(df1.reset_index(drop=True), df2.reset_index(drop=True))
 
 
+def test_submission_date_from_arxiv_id():
+    # Modern ids encode YYMM as the submission month; legacy ids return None.
+    assert data.submission_date_from_id("1406.0214") == "2014-06-01"
+    assert data.submission_date_from_id("2401.12345") == "2024-01-01"
+    assert data.submission_date_from_id("0704.0001") == "2007-04-01"
+    assert data.submission_date_from_id("hep-th/9901001") is None
+    assert data.submission_date_from_id("math/0309136") is None
+    assert data.submission_date_from_id("1413.0001") is None   # month 13 is invalid
+
+
 def test_chunk_corpus_one_per_abstract_with_stable_ids():
     df = pd.DataFrame({"id": ["1", "3"], "text": ["a b", "d"],
                        "primary_category": ["cs.LG", "cs.LG"],
