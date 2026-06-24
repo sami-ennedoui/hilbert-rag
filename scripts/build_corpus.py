@@ -20,6 +20,7 @@ import json
 import time
 
 import pandas as pd
+import pyarrow.parquet as pq
 from huggingface_hub import hf_hub_download, list_repo_files
 
 from hilbert_rag import config, data
@@ -62,12 +63,24 @@ def main() -> None:
             print(f"  shard {i}/{len(shards)} SKIPPED (download failed): {name}", flush=True)
             skipped.append(name)
             continue
-        shard = pd.read_parquet(path, columns=["id", "categories", "abstract", "title"])
-        keep = data.filter_frame(shard, config.ARXIV_CATEGORIES, config.DATE_MIN, config.DATE_MAX)
-        parts.append(keep)
-        print(f"  shard {i}/{len(shards)}: {len(shard)} rows -> {len(keep)} matches "
+        # Stream the shard in row-group batches so a full ~300k-row shard never sits
+        # in memory at once (that spike was saturating RAM).
+        n_rows = n_kept = 0
+        shard_parts = []
+        for batch in pq.ParquetFile(path).iter_batches(
+            batch_size=16384, columns=["id", "categories", "abstract", "title"]
+        ):
+            bdf = batch.to_pandas()
+            n_rows += len(bdf)
+            kept = data.filter_frame(bdf, config.ARXIV_CATEGORIES, config.DATE_MIN, config.DATE_MAX)
+            if len(kept):
+                shard_parts.append(kept)
+                n_kept += len(kept)
+            del bdf, batch
+        if shard_parts:
+            parts.append(pd.concat(shard_parts, ignore_index=True))
+        print(f"  shard {i}/{len(shards)}: {n_rows} rows -> {n_kept} matches "
               f"[{time.time() - t0:.0f}s]", flush=True)
-        del shard
 
     matches = (
         pd.concat(parts, ignore_index=True)
