@@ -2,24 +2,32 @@ import pandas as pd
 
 from hilbert_rag import data
 
-RECORDS = [
-    {"id": "1", "abstract": "  a b ", "categories": "cs.LG x", "update_date": "2023-05-01", "title": "T1"},
-    {"id": "2", "abstract": "c",      "categories": "math.PR",  "update_date": "2019-01-01", "title": "T2"},
-    {"id": "3", "abstract": "d",      "categories": "cs.LG",    "update_date": "2024-06-01", "title": "T3"},
-]
+
+def test_filter_frame_filters_by_id_date_and_category():
+    raw = pd.DataFrame(
+        {
+            "id":         ["1801.00001", "1901.00002", "9901.00003", "2012.00004", "1805.00005"],
+            "abstract":   ["  a b ",     "c",          "d",          "e",          ""],
+            "categories": ["cs.LG x",    "stat.ML",    "cs.LG",      "math.OC",    "cs.LG"],
+            "title":      ["T1",         "T2",         "T3",         "T4",         "T5"],
+        }
+    )
+    out = data.filter_frame(
+        raw, categories=("cs.LG", "stat.ML"), date_min="2018-01-01", date_max="2024-12-31"
+    )
+    # 1801 cs.LG 2018 keep; 1901 stat.ML 2019 keep; 9901 -> 1999 out of window;
+    # 2012 math.OC wrong category; 1805 cs.LG but empty abstract dropped.
+    assert set(out["id"]) == {"1801.00001", "1901.00002"}
+    assert list(out.columns) == ["id", "text", "primary_category", "published", "year", "title"]
+    assert (out["text"] == out["text"].str.strip()).all()
+    assert out.loc[out["id"] == "1801.00001", "year"].iloc[0] == 2018
 
 
-def test_filter_and_sample_respects_category_date_and_is_deterministic():
-    df1 = data.filter_and_sample(RECORDS, categories=("cs.LG",),
-                                 date_min="2022-01-01", date_max="2025-01-01",
-                                 target_n=2, seed=1234)
-    assert set(df1["primary_category"]) == {"cs.LG"}
-    assert set(df1["id"]) == {"1", "3"}            # id 2 dropped by category
-    assert (df1["text"] == df1["text"].str.strip()).all()
-    df2 = data.filter_and_sample(RECORDS, categories=("cs.LG",),
-                                 date_min="2022-01-01", date_max="2025-01-01",
-                                 target_n=2, seed=1234)
-    pd.testing.assert_frame_equal(df1.reset_index(drop=True), df2.reset_index(drop=True))
+def test_filter_frame_empty_when_nothing_matches():
+    raw = pd.DataFrame({"id": ["math/0309136"], "abstract": ["x"], "categories": ["cs.LG"], "title": ["T"]})
+    out = data.filter_frame(raw, categories=("cs.LG",), date_min="2018-01-01", date_max="2024-12-31")
+    assert len(out) == 0
+    assert list(out.columns) == ["id", "text", "primary_category", "published", "year", "title"]
 
 
 def test_submission_date_from_arxiv_id():
