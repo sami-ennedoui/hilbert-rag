@@ -82,6 +82,20 @@ def test_mine_triplets_negatives_exclude_positives():
     assert set(p.tolist()).isdisjoint(set(n.tolist()))      # positives (ranks 0-1) never negatives
 
 
+def test_save_and_load_head_roundtrip(tmp_path):
+    import torch
+
+    torch.manual_seed(0)
+    head = projection.ProjectionHead(in_dim=32, hidden=16, out_dim=8)
+    x = torch.randn(4, 32)
+    before = head(x).detach().numpy()
+    path = tmp_path / "head.pt"
+    projection.save_head(head, path, in_dim=32, hidden=16, out_dim=8, meta={"note": "test"})
+    loaded = projection.load_head(path)
+    after = loaded(x).detach().numpy()
+    assert np.allclose(before, after, atol=1e-6)
+
+
 def test_random_projector_deterministic_and_normed():
     v = np.random.default_rng(0).standard_normal((5, 16)).astype(np.float32)
     k1 = projection.random_projector(16, 4, seed=1234)(v)

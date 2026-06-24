@@ -13,6 +13,7 @@ exact-NN ranking are cached, since they need real neighbor data.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -174,6 +175,32 @@ def train_projection_infonce(
             batches += 1
         history.append(epoch_loss / max(batches, 1))
     return head, history
+
+
+def save_head(
+    head: ProjectionHead, path, in_dim: int, hidden: int, out_dim: int, meta: dict | None = None
+) -> None:
+    """Persist a trained head: weights plus the architecture dims needed to rebuild it,
+    plus optional metadata (the training config) for provenance."""
+    torch.save(
+        {
+            "state_dict": head.state_dict(),
+            "in_dim": int(in_dim),
+            "hidden": int(hidden),
+            "out_dim": int(out_dim),
+            "meta": meta or {},
+        },
+        str(path),
+    )
+
+
+def load_head(path) -> ProjectionHead:
+    """Rebuild a head from a checkpoint written by save_head; returns it in eval mode."""
+    ckpt = torch.load(str(Path(path)), map_location="cpu", weights_only=False)
+    head = ProjectionHead(ckpt["in_dim"], ckpt["hidden"], ckpt["out_dim"])
+    head.load_state_dict(ckpt["state_dict"])
+    head.eval()
+    return head
 
 
 def pca_projector(train_vecs: np.ndarray, d_low: int, seed: int) -> Projector:
