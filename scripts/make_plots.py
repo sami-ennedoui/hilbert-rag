@@ -129,11 +129,39 @@ def plot_multicurve() -> None:
     print(f"wrote {out}")
 
 
+def plot_learning_curve() -> None:
+    path = config.RESULTS_DIR / "learning_curve.csv"
+    if not path.exists():
+        print("(skip learning curve: results/learning_curve.csv not found; run scripts/run_learning_curve.py)")
+        return
+    rows = _load("learning_curve.csv")
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+    for ax, obj, title in [(axes[0], "infonce", "InfoNCE (the head used)"), (axes[1], "triplet", "Triplet (underperformed PCA)")]:
+        for d in sorted({int(r["d_low"]) for r in rows if r["objective"] == obj}):
+            pts = sorted(
+                ((int(r["epoch"]), float(r["loss"])) for r in rows if r["objective"] == obj and int(r["d_low"]) == d),
+                key=lambda t: t[0],
+            )
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], "o-", label=f"d_low={d}")
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("loss")
+        ax.set_title(f"{title} training loss")
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+    fig.suptitle("Projection training: both objectives converge, but only InfoNCE beat PCA downstream")
+    fig.tight_layout()
+    out = config.RESULTS_DIR / "plot_learning_curve.png"
+    fig.savefig(out, dpi=120)
+    plt.close(fig)
+    print(f"wrote {out}")
+
+
 def main() -> None:
     config.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     plot_recall_latency()
     plot_filtered_selectivity()
     plot_multicurve()
+    plot_learning_curve()
 
 
 if __name__ == "__main__":

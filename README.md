@@ -100,6 +100,10 @@ Exact search over the filtered subset is exact by construction and gets cheaper 
 
 At the curve's operating point, d_low = 8 and about a thousand candidates, the InfoNCE projection reaches coarse recall@10 of 0.353, against 0.322 for PCA and 0.151 for a random projection. A triplet objective trained but underperformed PCA, which is why the head uses InfoNCE. The curve-free ceiling diagnostic shows the remaining loss is the one-dimensional ordering, not the projection.
 
+![Projection training loss per objective](results/plot_learning_curve.png)
+
+Both objectives converge cleanly. Convergence alone is not the point: the triplet loss fell to near zero and still produced a worse key than PCA, because a margin between mined pairs does not preserve the global cosine order the oracle scores against. InfoNCE, which makes each anchor discriminate its true neighbor against many negatives at once, is what actually beat PCA.
+
 ## Where the SFC index wins, where FAISS wins, and what did not work
 
 - FAISS HNSW wins unfiltered retrieval, on both recall and latency. It is the service default.
