@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from hilbert_rag import embeddings
 
 
+@pytest.mark.network
 def test_embeddings_shape_norm_and_cache_roundtrip(tmp_path):
     vecs = embeddings.embed_texts(["hello world", "space filling curves"])
     assert vecs.shape == (2, 384)

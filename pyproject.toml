@@ -38,3 +38,6 @@ packages = ["src/hilbert_rag"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+  "network: needs network or a large model download; skipped in CI via -m 'not network'",
+]
