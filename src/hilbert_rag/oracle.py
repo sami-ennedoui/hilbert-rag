@@ -10,6 +10,21 @@ from __future__ import annotations
 import numpy as np
 
 
+def holdout_split(n: int, n_queries: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """Split positions [0, n) into a sorted query set and the sorted searchable
+    index (its complement). Deterministic given the seed.
+
+    Queries are held out of the index so a query never trivially retrieves itself;
+    its true neighbors are found among the index only.
+    """
+    rng = np.random.default_rng(seed)
+    query_idx = np.sort(rng.choice(n, size=n_queries, replace=False))
+    mask = np.ones(n, dtype=bool)
+    mask[query_idx] = False
+    index_idx = np.flatnonzero(mask)
+    return query_idx, index_idx
+
+
 def _topk_from_sims(sims: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     """Top-k by descending similarity for each row of a (Q, N) sim matrix."""
     q, n = sims.shape
