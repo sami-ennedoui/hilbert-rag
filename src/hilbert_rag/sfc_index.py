@@ -65,7 +65,8 @@ class MultiCurveSFCIndex:
     Each curve here applies a distinct diagonal offset to the quantized keys, wrapped
     modulo the grid size, so a point on a boundary in one curve is interior in another.
     The union of the per-curve windows recovers neighbors any one curve drops. This is
-    the standard multiple-shifted-curve fix (Leutenegger & Mokbel; HD-Index). With
+    a simplified diagonal-shift variant of the multiple-shifted-curve idea (Leutenegger &
+    Mokbel use independent per-axis shifts; HD-Index builds on that line). With
     n_curves == 1 the offset is 0 and the candidate set equals a plain SFCIndex.
 
     `query(key, window)` uses `window` as the per-curve half-width, so the union budget

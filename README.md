@@ -2,7 +2,7 @@
 
 A CPU-native RAG retrieval service. Its differentiator is a Hilbert space-filling-curve index built for filtered retrieval, with a trained PyTorch projection that makes the curve viable on semantic embeddings.
 
-Status: built end to end. The retrieval cascade, the trained projection, the benchmark, and a FastAPI service are in place and tested. Build state lives in `BUILD-PLAN.md`.
+Status: built end to end. The retrieval cascade, the trained projection, the benchmark, and a FastAPI service are in place and tested.
 
 ## What this is, honestly
 
@@ -11,13 +11,13 @@ This is a leakage-safe benchmark of a space-filling-curve index for dense retrie
 The value of the project is what it measures and how honestly it does it.
 
 - A trained PyTorch projection feeds the curve measurably better than PCA once the objective is right. An InfoNCE head beats PCA on the candidate-set recall the system actually depends on.
-- The standard multiple-shifted-curve fix is implemented and measured. Eight shifted curves recover a large part of the single-curve deficit while scanning fewer candidates, and they still do not catch HNSW. The benchmark shows exactly how much the fix buys and where it stops.
+- A multiple-shifted-curve fix is implemented and measured. Eight shifted curves recover a large part of the single-curve deficit while scanning fewer candidates, and they still do not catch HNSW. The benchmark shows exactly how much the fix buys and where it stops.
 - The failure is decomposed, not guessed. The projection preserves most of the neighbor structure, and the one-dimensional curve order then discards it. Those two losses are measured separately.
 - The index is small and dependency-light, about a hundred lines you can read end to end.
 
 This is a reproduction and extension of a published line of work, HD-Index and Leutenegger and Mokbel, not novel research. Learned projection into a one-dimensional index is also known, for instance LIDER. Saying so is part of what makes the benchmark credible.
 
-The retrieval quality oracle is exact nearest neighbors in embedding space, not human-judged relevance. Every number in the results comes from a measurement saved to disk, never a rounded or hoped-for figure.
+The retrieval quality oracle is exact nearest neighbors in embedding space, not human-judged relevance. Every benchmarked number comes from a measurement saved to disk, never a rounded or hoped-for figure.
 
 ## Layout
 
@@ -62,7 +62,7 @@ Set `HF_TOKEN` to enable `/ask` against the Hugging Face router. Without it, `/a
 
 ## Results
 
-All numbers are measured and saved under `results/`, and every figure is regenerated from those CSVs by `scripts/make_plots.py`. The oracle is exact cosine nearest neighbors over the full 384-dimensional embeddings, on 300 held-out queries against a 39,700-vector arXiv index.
+All numbers are measured and saved under `results/`, and every figure is regenerated from those CSVs by `scripts/make_plots.py`. The oracle is exact cosine nearest neighbors over the full 384-dimensional embeddings, on 300 held-out queries against a 39,700-vector arXiv index. For the SFC cascade, end-to-end recall@k equals coarse recall@k by construction: the rerank is exact and deeper than k, so any true neighbor present in the candidate set is returned, which makes the candidate set the binding ceiling.
 
 ### Unfiltered retrieval: HNSW wins
 
@@ -77,9 +77,9 @@ All numbers are measured and saved under `results/`, and every figure is regener
 
 HNSW is both higher recall and faster. The SFC cascade is not competitive on plain unfiltered retrieval, and the project says so.
 
-### Multi-curve: the standard fix, measured
+### Multi-curve: shifted curves, measured
 
-A single Hilbert curve splits some neighbors across a recursion boundary, which is why its recall collapses in high dimension. The standard fix is several shifted curves whose candidate windows are unioned. At a fixed total candidate budget:
+A single Hilbert curve splits some neighbors across a recursion boundary, which is why its recall collapses in high dimension. The standard idea is several shifted curves whose candidate windows are unioned; here each curve is a single diagonal offset of the grid with wraparound, a simplified variant of the independent per-axis shifts used in the literature. At a fixed total candidate budget:
 
 ![Multi-curve recall versus number of curves](results/plot_multicurve.png)
 
@@ -94,7 +94,7 @@ Eight curves lift coarse recall@10 from 0.353 to 0.498 at the small budget and f
 
 ![Recall and latency versus selectivity](results/plot_filtered_selectivity.png)
 
-Exact search over the filtered subset is exact by construction and gets cheaper as the filter tightens, down to 0.05 ms at one percent selectivity. HNSW post-filtering must over-retrieve to return k matches, so its latency climbs to about 112 ms at one percent. The SFC filter has flat latency near 0.2 ms but its recall stays between 0.16 and 0.51. There is no selectivity where the curve sits on the recall and latency frontier.
+Exact search over the filtered subset is exact by construction and gets cheaper as the filter tightens, down to 0.05 ms at one percent selectivity. HNSW post-filtering must over-retrieve to return k matches, so its latency climbs to about 112 ms at one percent. The SFC filter has flat latency near 0.2 ms but its recall stays between 0.16 and 0.51. There is no selectivity where the curve sits on the recall and latency frontier. These SFC filter numbers use the single-curve index for a clean comparison; eight curves would raise them in line with the unfiltered gain but still lose to exact pre-filter, which is exact by definition.
 
 ### Projection ablation: the learned head is the best key
 
@@ -108,7 +108,7 @@ Both objectives converge cleanly. Convergence alone is not the point: the triple
 
 - FAISS HNSW wins unfiltered retrieval, on both recall and latency. It is the service default.
 - Exact pre-filter wins filtered retrieval whenever the filter is selective, on both recall and latency, because the subset is small enough to scan exactly.
-- The SFC index wins nothing at this corpus size. Its one honest structural property is a small index-structure footprint, about 24 bytes per item for a sorted key and id against roughly 256 bytes per item for an HNSW graph at M=32. The raw vectors dominate total memory regardless, so this is an index-structure statement, not a total-memory one.
+- The SFC index wins nothing at this corpus size. Its one honest structural property is a smaller index-structure footprint, and this is an arithmetic bound rather than a runtime measurement: the index is a few integer arrays, on the order of 24 bytes per item for the sorted key, id, and order, against roughly 256 bytes per item for an HNSW graph at M=32 with its 2*M links. The raw vectors dominate total memory regardless, so this is an index-structure statement, not a total-memory one.
 - What did not work: a single Hilbert curve loses most neighbor structure in high dimension; a triplet loss was a weak proxy for global cosine order; raising d_low to 16 helped the projection ceiling but hurt the curve; raising the bit depth did nothing because quantization was never the bottleneck.
 - What the literature does instead: filtered approximate search at scale now uses range-aware graph indexes such as SeRF and ACORN, not space-filling curves. A corpus-scaling crossover for the curve's flat latency is plausible but unmeasured here, so it stays future work rather than a claim.
 

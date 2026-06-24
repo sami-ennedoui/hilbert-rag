@@ -1,6 +1,6 @@
 """Hilbert-RAG: CPU-native RAG retrieval with a space-filling-curve index.
 
-See BUILD-PLAN.md for build state and DESIGN-SPEC.md for the full design.
+See the README for the design, the measured results, and how to run the service.
 """
 
 __version__ = "0.1.0"
