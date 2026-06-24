@@ -29,6 +29,29 @@ def test_train_projection_loss_decreases_on_separable_data():
     assert isinstance(head, projection.ProjectionHead)
 
 
+def test_train_projection_infonce_decreases_and_separates():
+    rng = np.random.default_rng(0)
+    d = 32
+
+    def _n(x):
+        return (x / np.linalg.norm(x, axis=1, keepdims=True)).astype(np.float32)
+
+    a = _n(rng.standard_normal((256, d)))
+    p = _n(a + 0.01 * rng.standard_normal((256, d)))     # each anchor's true neighbor
+    head, history = projection.train_projection_infonce(
+        a, p, d_low=8, in_dim=d, epochs=20, lr=1e-2, batch_size=64, seed=0
+    )
+    assert history[-1] < history[0]
+    # after training, projected anchor is closer to its own positive than to a random other
+    import torch
+    with torch.no_grad():
+        za = head(torch.from_numpy(a))
+        zp = head(torch.from_numpy(p))
+    own = (za * zp).sum(1).mean().item()
+    other = (za * torch.roll(zp, 1, 0)).sum(1).mean().item()
+    assert own > other
+
+
 def test_pca_projector_shape_and_norm():
     vecs = np.random.default_rng(0).standard_normal((100, 16)).astype(np.float32)
     proj = projection.pca_projector(vecs, d_low=4, seed=1234)

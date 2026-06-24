@@ -126,6 +126,56 @@ def train_projection(
     return head, history
 
 
+def train_projection_infonce(
+    a_vecs: np.ndarray,
+    p_vecs: np.ndarray,
+    d_low: int,
+    in_dim: int = 384,
+    hidden: int = 128,
+    epochs: int = 15,
+    batch_size: int = 512,
+    lr: float = 1e-3,
+    temperature: float = 0.1,
+    seed: int = 1234,
+) -> tuple[ProjectionHead, list[float]]:
+    """Train the projection head with an InfoNCE loss over (anchor, positive) pairs,
+    using the other positives in the batch as negatives.
+
+    Unlike the pairwise triplet loss, InfoNCE makes each anchor discriminate its true
+    neighbor against many negatives at once, a far stronger signal for preserving the
+    global cosine geometry the oracle uses (spec §5.4 permits triplet or InfoNCE).
+    Each row of a_vecs is an anchor and the same row of p_vecs is one of its true
+    nearest neighbors. Returns the trained head and per-epoch mean loss.
+    """
+    torch.manual_seed(seed)
+    head = ProjectionHead(in_dim, hidden, d_low)
+    opt = torch.optim.Adam(head.parameters(), lr=lr)
+    a = torch.from_numpy(np.ascontiguousarray(a_vecs, dtype=np.float32))
+    p = torch.from_numpy(np.ascontiguousarray(p_vecs, dtype=np.float32))
+    n_pairs = a.shape[0]
+    rng = np.random.default_rng(seed)
+
+    history: list[float] = []
+    for _ in range(epochs):
+        perm = rng.permutation(n_pairs)
+        epoch_loss, batches = 0.0, 0
+        for start in range(0, n_pairs, batch_size):
+            idx = perm[start : start + batch_size]
+            if idx.size < 2:  # InfoNCE needs at least one negative in the batch
+                continue
+            za, zp = head(a[idx]), head(p[idx])
+            logits = za @ zp.T / temperature           # (b, b); row i positive is column i
+            labels = torch.arange(za.shape[0])
+            loss = F.cross_entropy(logits, labels)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            epoch_loss += float(loss.item())
+            batches += 1
+        history.append(epoch_loss / max(batches, 1))
+    return head, history
+
+
 def pca_projector(train_vecs: np.ndarray, d_low: int, seed: int) -> Projector:
     """Fit PCA on train_vecs; return a transform that projects to d_low and L2-normalizes."""
     pca = PCA(n_components=d_low, random_state=seed)
