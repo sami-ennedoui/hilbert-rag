@@ -25,3 +25,6 @@ data/
 # Local scratch
 scratch/
 *.log
+
+# Local-only planning / resume anchor, kept out of the public repo
+BUILD-PLAN.md
