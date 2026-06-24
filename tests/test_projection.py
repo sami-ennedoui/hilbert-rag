@@ -20,6 +20,28 @@ def test_pca_projector_shape_and_norm():
     assert np.allclose(np.linalg.norm(keys, axis=1), 1.0, atol=1e-5)
 
 
+def test_mine_triplets_picks_right_ranks_and_shapes():
+    # 2 anchors, 10 ranked neighbors each (values are arbitrary corpus positions).
+    ranking = np.array([
+        [100, 101, 102, 103, 104, 105, 106, 107, 108, 109],
+        [200, 201, 202, 203, 204, 205, 206, 207, 208, 209],
+    ])
+    a, p, n = projection.mine_triplets(ranking, n_pos=1, neg_lo=3, neg_hi=8, n_neg=2, seed=0)
+    assert len(a) == len(p) == len(n) == 2 * 1 * 2          # A * n_pos * n_neg
+    assert set(p.tolist()) == {100, 200}                    # positive = closest neighbor
+    assert set(a.tolist()) == {0, 1}                        # anchor row indices
+    # negatives come only from ranks [3, 8)
+    assert set(n.tolist()).issubset(
+        {103, 104, 105, 106, 107, 203, 204, 205, 206, 207}
+    )
+
+
+def test_mine_triplets_negatives_exclude_positives():
+    ranking = np.tile(np.arange(20), (3, 1))
+    _, p, n = projection.mine_triplets(ranking, n_pos=2, neg_lo=5, neg_hi=15, n_neg=3, seed=1)
+    assert set(p.tolist()).isdisjoint(set(n.tolist()))      # positives (ranks 0-1) never negatives
+
+
 def test_random_projector_deterministic_and_normed():
     v = np.random.default_rng(0).standard_normal((5, 16)).astype(np.float32)
     k1 = projection.random_projector(16, 4, seed=1234)(v)
