@@ -133,3 +133,27 @@ def test_ask_without_llm_returns_503():
     client = TestClient(create_app(engine, llm=None))
     r = client.post("/ask", json={"query": "anything"})
     assert r.status_code == 503
+
+
+def test_search_faiss_flat_backend_is_exact_and_honors_filter(client_and_data):
+    client, texts, ids, _, _ = client_and_data
+    r = client.post("/search", json={"query": texts[7], "k": 3, "backend": "faiss_flat"})
+    assert r.status_code == 200
+    assert r.json()["backend"] == "faiss_flat"
+    assert r.json()["results"][0]["id"] == ids[7]  # exact backend returns the queried item first
+    r2 = client.post(
+        "/search",
+        json={"query": texts[0], "k": 6, "backend": "faiss_flat", "filter": {"categories": ["cs.CL"]}},
+    )
+    assert r2.status_code == 200
+    assert all(h["category"] == "cs.CL" for h in r2.json()["results"])
+
+
+def test_ask_grounds_only_on_filtered_chunks(client_and_data):
+    client, texts, ids, cats, _ = client_and_data
+    id_to_cat = dict(zip(ids, cats))
+    r = client.post("/ask", json={"query": texts[1], "k": 4, "filter": {"categories": ["cs.LG"]}})
+    assert r.status_code == 200
+    cited = r.json()["cited_ids"]
+    assert len(cited) >= 1
+    assert all(id_to_cat[cid] == "cs.LG" for cid in cited)  # every grounding chunk passes the filter
