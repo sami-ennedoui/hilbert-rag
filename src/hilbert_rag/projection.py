@@ -80,6 +80,52 @@ def mine_triplets(
     return np.asarray(anchors), np.asarray(positives), np.asarray(negatives)
 
 
+def train_projection(
+    a_vecs: np.ndarray,
+    p_vecs: np.ndarray,
+    n_vecs: np.ndarray,
+    d_low: int,
+    in_dim: int = 384,
+    hidden: int = 128,
+    epochs: int = 10,
+    batch_size: int = 1024,
+    lr: float = 1e-3,
+    margin: float = 0.2,
+    seed: int = 1234,
+) -> tuple[ProjectionHead, list[float]]:
+    """Train the projection head with a triplet margin loss on (anchor, positive,
+    negative) vectors. The loss pushes the projected anchor closer to its positive than
+    to its hard negative: max(0, margin - <za,zp> + <za,zn>), keys L2-normalized so the
+    dot product is cosine. Returns the trained head and the per-epoch mean loss.
+    """
+    torch.manual_seed(seed)
+    head = ProjectionHead(in_dim, hidden, d_low)
+    opt = torch.optim.Adam(head.parameters(), lr=lr)
+    a = torch.from_numpy(np.ascontiguousarray(a_vecs, dtype=np.float32))
+    p = torch.from_numpy(np.ascontiguousarray(p_vecs, dtype=np.float32))
+    n = torch.from_numpy(np.ascontiguousarray(n_vecs, dtype=np.float32))
+    n_triplets = a.shape[0]
+    rng = np.random.default_rng(seed)
+
+    history: list[float] = []
+    for _ in range(epochs):
+        perm = rng.permutation(n_triplets)
+        epoch_loss, batches = 0.0, 0
+        for start in range(0, n_triplets, batch_size):
+            idx = perm[start : start + batch_size]
+            za, zp, zn = head(a[idx]), head(p[idx]), head(n[idx])
+            pos_sim = (za * zp).sum(dim=1)
+            neg_sim = (za * zn).sum(dim=1)
+            loss = torch.relu(margin - pos_sim + neg_sim).mean()
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            epoch_loss += float(loss.item())
+            batches += 1
+        history.append(epoch_loss / max(batches, 1))
+    return head, history
+
+
 def pca_projector(train_vecs: np.ndarray, d_low: int, seed: int) -> Projector:
     """Fit PCA on train_vecs; return a transform that projects to d_low and L2-normalizes."""
     pca = PCA(n_components=d_low, random_state=seed)

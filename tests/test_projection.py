@@ -12,6 +12,23 @@ def test_projection_head_shape_and_unit_norm():
     assert np.allclose(y.norm(dim=1).detach().numpy(), 1.0, atol=1e-5)
 
 
+def test_train_projection_loss_decreases_on_separable_data():
+    rng = np.random.default_rng(0)
+    d = 32
+
+    def _n(x):
+        return (x / np.linalg.norm(x, axis=1, keepdims=True)).astype(np.float32)
+
+    a = _n(rng.standard_normal((200, d)))
+    p = _n(a + 0.01 * rng.standard_normal((200, d)))     # positives near their anchor
+    neg = _n(rng.standard_normal((200, d)))              # negatives unrelated
+    head, history = projection.train_projection(
+        a, p, neg, d_low=8, in_dim=d, epochs=15, lr=1e-2, seed=0
+    )
+    assert history[-1] < history[0]                      # the ranking loss went down
+    assert isinstance(head, projection.ProjectionHead)
+
+
 def test_pca_projector_shape_and_norm():
     vecs = np.random.default_rng(0).standard_normal((100, 16)).astype(np.float32)
     proj = projection.pca_projector(vecs, d_low=4, seed=1234)
