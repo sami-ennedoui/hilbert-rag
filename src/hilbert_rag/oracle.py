@@ -59,3 +59,29 @@ def exact_topk_masked(
     sims = query_vecs.astype(np.float32) @ corpus_vecs.astype(np.float32).T
     sims = np.where(np.asarray(mask, dtype=bool)[None, :], sims, -np.inf)
     return _topk_from_sims(sims, k)
+
+
+def neighbor_ranking(
+    corpus_vecs: np.ndarray, anchor_pos: np.ndarray, width: int, block: int = 512
+) -> np.ndarray:
+    """Exact-NN ranking of each anchor's `width` nearest neighbors within the corpus,
+    excluding the anchor itself, sorted by descending cosine.
+
+    This is the training signal for hard-negative mining (projection.mine_triplets):
+    positives come from the top ranks, hard negatives from a deeper band. Computed in
+    anchor blocks so the (block, N) similarity matrix never blows up memory.
+
+    Returns (A, width') int64 of corpus positions, where width' = min(width, N - 1).
+    """
+    corpus_vecs = np.asarray(corpus_vecs, dtype=np.float32)
+    anchor_pos = np.asarray(anchor_pos, dtype=np.int64)
+    n = corpus_vecs.shape[0]
+    width = min(width, n - 1)
+    out = np.empty((anchor_pos.shape[0], width), dtype=np.int64)
+    for start in range(0, anchor_pos.shape[0], block):
+        blk = anchor_pos[start : start + block]
+        sims = corpus_vecs[blk] @ corpus_vecs.T          # (b, N)
+        sims[np.arange(blk.shape[0]), blk] = -np.inf       # drop self
+        idx, _ = _topk_from_sims(sims, width)
+        out[start : start + blk.shape[0]] = idx
+    return out
