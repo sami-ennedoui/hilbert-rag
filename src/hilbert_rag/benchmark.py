@@ -44,3 +44,18 @@ def coarse_recall_at_k(candidate_sets: Sequence[np.ndarray], oracle: np.ndarray,
         cand = set(np.asarray(candidate_sets[i]).tolist())
         total += len(truth & cand) / k
     return total / q
+
+
+def summarize_latency(times_ms: Sequence[float]) -> dict:
+    """Summary statistics for a list of per-query latencies in milliseconds.
+
+    Latency is the half of the recall/latency trade-off that the SFC index has to win
+    on; reported as p50, p95, and mean so the tail is visible, not just the average.
+    """
+    arr = np.asarray(times_ms, dtype=np.float64)
+    return {
+        "p50": float(np.percentile(arr, 50)),
+        "p95": float(np.percentile(arr, 95)),
+        "mean": float(arr.mean()),
+        "n": int(arr.size),
+    }

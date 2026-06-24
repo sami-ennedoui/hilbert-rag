@@ -23,3 +23,14 @@ def test_recall_is_one_when_retrieved_covers_truth():
     oracle = np.array([[10, 11, 12]])
     retrieved = np.array([[12, 11, 10]])     # order-insensitive
     assert benchmark.recall_at_k(retrieved, oracle, k=3) == 1.0
+
+
+def test_summarize_latency_reports_percentiles():
+    times = [float(t) for t in range(1, 101)]   # 1..100 ms
+    s = benchmark.summarize_latency(times)
+    assert set(s) == {"p50", "p95", "mean", "n"}
+    assert s["n"] == 100
+    assert abs(s["mean"] - 50.5) < 1e-9
+    assert abs(s["p50"] - np.percentile(times, 50)) < 1e-9
+    assert abs(s["p95"] - np.percentile(times, 95)) < 1e-9
+    assert s["p95"] >= s["p50"]
